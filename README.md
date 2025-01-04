@@ -13,12 +13,12 @@ Features:
 
 ### How to install the Extension (Chrome & Edge only)
 
-1. Download the "browser extension" folder (click on the green code button at the top right, a dropdown will appear, then click "Download Zip" 
-2. Extract the zip file.
-3. In the url bar, enter the following: For Google Chrome enter `chrome://extensions/` or `edge://extensions` for MicroSoft Edge
+1. Download the [latest release](https://github.com/rrokutaro/pinterest-board-downloader/releases) (the .zip file)
+2. Extract the .zip file (you can use winrar or 7zip or built-in windows extractor)
+3. Go to your browser. For Google Chrome enter `chrome://extensions/` or for MicroSoft Edge enter `edge://extensions` in the url bar.
 4. Enable **Developer mode**.
 5. Click **Load unpacked**, a pop up will appear, then select the "browser extension" that you just downloaded
-6. Go to Pinterest and the extension will now be working.
+6. Go to Pinterest and the extension will now be working. Enjoy!
    <br>
 
 ### Task A: Select pins and download
