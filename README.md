@@ -1,4 +1,4 @@
-### Pinterest Board Downloader Extension 2025
+### Pinterest Board Downloader Extension
 
 ![alt text](./readme-assets/image-7.png)
 
