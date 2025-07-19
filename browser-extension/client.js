@@ -874,6 +874,7 @@ async function download_pins(urls) {
             // Trigger the download
             document.body.appendChild(link); // Required for Firefox
             link.click();
+            await new Promise(resolve => setTimeout(resolve, 200));
 
             // Clean up the link
             document.body.removeChild(link);
