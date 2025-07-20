@@ -927,7 +927,14 @@ async function select_pins(pin_urls, reselect = false, subtle = true) {
 
 function update_currently_selected_pins() {
     console.log(`update_currently_selected_pins()`);
-    DOM.full_ui_wrapper.selected_pins_wrapper.currently_selected_pins_count_elem.self.innerHTML = `${selected_pins?.size || 0}`;
+    let pin_count = selected_pins?.size || 0;
+    let formatted_pin_count;
+    if (pin_count >= 1_000_000_000) formatted_pin_count = `${(pin_count / 1_000_000_000).toFixed(2)}B`;
+    else if (pin_count >= 1_000_000) formatted_pin_count = `${(pin_count / 1_000_000).toFixed(2)}M`;
+    else if (pin_count >= 1_000) formatted_pin_count = `${(pin_count / 1_000).toFixed(2)}k`;
+    else formatted_pin_count = `${pin_count}`;
+    
+    DOM.full_ui_wrapper.selected_pins_wrapper.currently_selected_pins_count_elem.self.innerHTML = formatted_pin_count;
     return true;
 }
 
