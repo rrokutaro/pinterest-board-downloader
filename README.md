@@ -14,7 +14,7 @@
 
 ## What's Fixed
 
-- **Multiple Downloads**: Resolved an issue preventing multiple downloads on Arc and Chrome browsers, thanks to @Gintasz. (See [Issue \#3245405803](https://github.com/rrokutaro/pinterest-board-downloader/pull/2#issue-3245405803))
+- **Multiple Downloads**: Resolved an issue preventing multiple downloads on Arc and Chrome browsers, thanks to @{Gintasz}. (See [Issue \#3245405803](https://github.com/rrokutaro/pinterest-board-downloader/pull/2#issue-3245405803))
 - **Pin Selection**: Fixed problems where some pins weren't selecting correctly or were showing low-quality images.
 - **Memory Usage**: Improved memory management during long downloads by clearing old pins, preventing slowdowns.
 
