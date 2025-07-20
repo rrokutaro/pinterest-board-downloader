@@ -1070,10 +1070,12 @@ async function download_pins(urls) {
 
 function get_board_pin_count() {
     console.log(`get_board_pin_count()`);
+
     let pin_count_element = document.querySelector('[data-test-id="pin-count"]');
+
     let pin_count = parseInt(
-        document.body.innerText?.match(/\d+\s*pin[s]*/i)?.[0]?.match(/\d+/)?.[0] ||
-        pin_count_element?.innerText?.match(/\d+\s*pin[s]*/i)?.[0]?.match(/\d+/)?.[0]
+        (document.body.innerText?.match(/[\d,]+\s*pin[s]*/i)?.[0]?.match(/[\d,]+/)?.[0] || 
+         pin_count_element?.innerText?.match(/[\d,]+\s*pin[s]*/i)?.[0]?.match(/[\d,]+/)?.[0])?.replace(/,/g, '')
     );
 
     if (!Number.isInteger(pin_count)) {
