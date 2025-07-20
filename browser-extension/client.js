@@ -47,7 +47,16 @@ let message_template = {
 
 const progress_logs = ['cc_log', 'cc_warning', 'cc_error', 'cc_success'];
 function logger(level, message, context = {}) {
-    const timestamp = new Date().toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' });
+    const timestamp = new Date().toLocaleString(undefined, {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false // 24-hour format
+    });
+
     const logMessage = `[${timestamp}] [${level}] ${message} ${Object.keys(context).length > 0 ? JSON.stringify(context) : ''}`;
     switch (level) {
         case 'ERROR': console.error(logMessage); break;
