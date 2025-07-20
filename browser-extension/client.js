@@ -4,9 +4,9 @@ let observer;
 let last_pin_received_time = 0;
 let last_pin_received_cut_off_duration_ms = (1_000 * 30); // 30s
 let cancel_downloads = false;
-let stateful_mode = true; // Global variable to toggle stateful/stateless mode
-let MAX_CONCURRENT_DOWNLOADS = 10; // Throttle updates
-let downloaded_pins = new Set(); // Track downloaded pins in stateful mode
+let stateful_mode = true; 
+let MAX_CONCURRENT_DOWNLOADS = 10; 
+let downloaded_pins = new Set(); 
 
 let DOM_template = {
     downloader_button: { self: null },
