@@ -1,80 +1,67 @@
-### Pinterest Board Downloader Extension
+# Pinterest Board & Pin Downloader Extension
 
-![alt text](./readme-assets/image-7.png)
+## ![Hero](./readme-assets/image-7.png)
 
-Features:
+## What's New (v1.1 - July 20, 2025)
 
-- Users can hover over any pin, select it, and add it to a queue of selected pins to be downloaded
-- Users can select all currently visible pins
-- Mainly, users can download all pins within a pinterest board (assuming that they are on a pinterest board page).
-- Image downloads only (no videos)
-- A Fast and simple Pinterest Downloader
-  <br>
+**Best Image Quality**: Get the highest resolution images available, even if they're not immediately visible on the page. Enjoy crisp, clear downloads every time.
 
-### How to install the Extension (Chrome & Edge only)
+![Hero](./readme-assets/image-8.png)
 
-1. Download the [latest release](https://github.com/rrokutaro/pinterest-board-downloader/releases) (the .zip file)
-2. Extract the .zip file (you can use winrar or 7zip or built-in windows extractor)
-3. Go to your browser. For Google Chrome enter `chrome://extensions/` or for MicroSoft Edge enter `edge://extensions` in the url bar.
-4. Enable **Developer mode**.
-5. Click **Load unpacked**, a pop up will appear, then select the "browser extension" that you just downloaded
-6. Go to Pinterest and the extension will now be working. Enjoy!
-   <br>
-
-### Task A: Select pins and download
-
-User enables the pinterest board downloader by clicking on the button
-
-![alt text](./readme-assets/image.png)
-<br>
-
-The popup will then show up fully
-
-![alt text](./readme-assets/image-1.png)
-<br>
-
-While hovering over a pin, the user holds down the `ShiftKey` + `Right Click` which selects the pin, selecting the pin again unselects it.
-
-![alt text](./readme-assets/Animation.webp)
-<br>
-
-User clicks the download button for currently selected pins and the download process begins.
-
-![alt text](./readme-assets/image-2.png)
-
-Once the download process is complete, the appropriate feedback message is shown.
-
-![alt text](./readme-assets/image-3.png)
-<br>
-
-Finally, user closes the downloader. Upon closing, selected pins are removed, and will no longer be highlighted. Re-opening the ui would mean a new session (old pins are not remembered).
-
-![alt text](./readme-assets/image-4.png)
-<br>
+- **Skip Already Downloaded Pins**: Save time and avoid duplicates. The extension now skips pins you've already downloaded, this is very useful for growing boards and avoids re-downloading old pins (enabled by default, toggle it in the interface).
+- **Download in Batches**: Experience smoother performance with downloads now processed in smaller batches (up to 10 pins at a time).
 
 ---
 
+## What's Fixed
+
+- **Multiple Downloads**: Resolved an issue preventing multiple downloads on Arc and Chrome browsers, thanks to @Gintasz. (See [Issue \#3245405803](https://github.com/rrokutaro/pinterest-board-downloader/pull/2#issue-3245405803))
+- **Pin Selection**: Fixed problems where some pins weren't selecting correctly or were showing low-quality images.
+- **Memory Usage**: Improved memory management during long downloads by clearing old pins, preventing slowdowns.
+
+---
+
+## Features
+
+This extension simplifies downloading images from Pinterest with powerful, user-friendly features:
+
+- **Individual Pin Selection**: Hover over any pin to select it and add it to your download queue.
+- **Select All Visible Pins**: Quickly grab all pins currently displayed on your screen.
+- **Download Entire Boards**: Easily download all pins from any Pinterest board you're viewing.
+- **Image Downloads Only**: Focuses solely on downloading images, providing a fast and efficient solution.
+
+---
+
+## How to Install (Chrome & Edge)
+
+Get started in just a few steps:
+
+1.  **Download the latest release**: Grab the `.zip` file from the [releases page](https://github.com/rrokutaro/pinterest-board-downloader/releases).
+2.  **Extract the file**: Unzip the downloaded file to a convenient location on your computer (should be named "browser-extension")
+3.  **Open Extensions**:
+    - **Chrome**: Go to `chrome://extensions/`
+    - **Microsoft Edge**: Go to `edge://extensions`
+4.  **Enable Developer Mode**: Toggle on **Developer mode** in the top right corner.
+5.  **Load Unpacked**: Click on **Load unpacked** and select the folder you extracted in step 2.
+6.  **Start Downloading**: Navigate to Pinterest and begin downloading your favorite pins\!
+
+---
+
+## How to Use the Extension
+
+### Download All Board Pins
+
+To download every pin on a Pinterest board, simply click the second download button (the one in the middle) in the extension interface.
+
+![Hero](./readme-assets/animation-2.gif)
 <br>
 
-### Task B: Download All Board Pins
+### Download Specific Pins
 
-User enables the Pinterest Board Downloader
+Want to pick and choose? Here's how:
 
-![alt text](./readme-assets/image.png)
-<br>
+![Hero](./readme-assets/animation-3.gif)
 
-Clicks the 2nd download button that will first extract all pins until the number of extracted pins is equal to the specified number of board pins.
-
-![alt text](./readme-assets/image-5.png)
-
-![alt text](./readme-assets/image-2.png)
-
-Finally, user receives a successful download response.
-
-![alt text](./readme-assets/image-6.png)
-<br>
-
-Finally, user closes the downloader. Upon closing, selected pins are removed, and will no longer be highlighted. Re-opening the ui would mean a new session (old pins are not remembered).
-
-![alt text](./readme-assets/image-4.png)
-<br>
+- **Select/Deselect Pins**: Hold down the `ShiftKey` + `rightClick` on any pin to select it. Right-clicking again (while holding shift) will deselect it.
+- **Download Selected**: Once you've selected your pins, click the first download button.
+- **Select All Visible**: Use the "Select All Visible Pins" button to bulk select currently visible pins
