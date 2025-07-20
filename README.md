@@ -11,7 +11,6 @@
 - **Skip Already Downloaded Pins**: Save time and avoid duplicates. The extension now skips pins you've already downloaded, this is very useful for growing boards and avoids re-downloading old pins (enabled by default, toggle it in the interface).
 - **Download in Batches**: Experience smoother performance with downloads now processed in smaller batches (up to 10 pins at a time).
 
----
 
 ## What's Fixed
 
@@ -19,7 +18,6 @@
 - **Pin Selection**: Fixed problems where some pins weren't selecting correctly or were showing low-quality images.
 - **Memory Usage**: Improved memory management during long downloads by clearing old pins, preventing slowdowns.
 
----
 
 ## Features
 
@@ -30,7 +28,6 @@ This extension simplifies downloading images from Pinterest with powerful, user-
 - **Download Entire Boards**: Easily download all pins from any Pinterest board you're viewing.
 - **Image Downloads Only**: Focuses solely on downloading images, providing a fast and efficient solution.
 
----
 
 ## How to Install (Chrome & Edge)
 
@@ -45,7 +42,6 @@ Get started in just a few steps:
 5.  **Load Unpacked**: Click on **Load unpacked** and select the folder you extracted in step 2.
 6.  **Start Downloading**: Navigate to Pinterest and begin downloading your favorite pins\!
 
----
 
 ## How to Use the Extension
 
