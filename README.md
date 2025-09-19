@@ -1,6 +1,6 @@
 # Pinterest Board & Pin Downloader Extension
 
-## ![Hero](./readme-assets/banner.png)
+## ![Hero](./readme-assets/download.png)
 
 ## What's New (v1.2 - Sept 19, 2025)
 
