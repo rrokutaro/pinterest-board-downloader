@@ -1,12 +1,12 @@
 # Pinterest Board & Pin Downloader Extension
 
-## ![Hero](./readme-assets/image-7.png)
+## ![Hero](./readme-assets/banner.png)
 
 ## What's New (v1.1 - July 20, 2025)
 
 **Best Image Quality**: Get the highest resolution images available, even if they're not immediately visible on the page. Enjoy crisp, clear downloads every time.
 
-![Hero](./readme-assets/banner.png)
+![Hero](./readme-assets/image-8.png)
 
 - **Skip Already Downloaded Pins**: Save time and avoid duplicates. The extension now skips pins you've already downloaded, this is very useful for growing boards and avoids re-downloading old pins (enabled by default, toggle it in the interface).
 - **Download in Batches**: Experience smoother performance with downloads now processed in smaller batches (up to 10 pins at a time).
@@ -49,14 +49,14 @@ Get started in just a few steps:
 
 To download every pin on a Pinterest board, simply click the second download button (the one in the middle) in the extension interface.
 
-![Hero](./readme-assets/board.mp4)
+![Hero](./readme-assets/board.gif)
 <br>
 
 ### Download Specific Pins
 
 Want to pick and choose? Here's how:
 
-![Hero](./readme-assets/single.mp4)
+![Hero](./readme-assets/single.gif)
 
 - **Select/Deselect Pins**: Hold down the `ShiftKey` + `rightClick` on any pin to select it. Right-clicking again (while holding shift) will deselect it.
 - **Download Selected**: Once you've selected your pins, click the first download button.
