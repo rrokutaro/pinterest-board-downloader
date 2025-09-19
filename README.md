@@ -6,7 +6,7 @@
 
 **Best Image Quality**: Get the highest resolution images available, even if they're not immediately visible on the page. Enjoy crisp, clear downloads every time.
 
-![Hero](./readme-assets/image-8.png)
+![Hero](./readme-assets/banner.png)
 
 - **Skip Already Downloaded Pins**: Save time and avoid duplicates. The extension now skips pins you've already downloaded, this is very useful for growing boards and avoids re-downloading old pins (enabled by default, toggle it in the interface).
 - **Download in Batches**: Experience smoother performance with downloads now processed in smaller batches (up to 10 pins at a time).
@@ -49,14 +49,14 @@ Get started in just a few steps:
 
 To download every pin on a Pinterest board, simply click the second download button (the one in the middle) in the extension interface.
 
-![Hero](./readme-assets/animation-2.gif)
+![Hero](./readme-assets/board.mp4)
 <br>
 
 ### Download Specific Pins
 
 Want to pick and choose? Here's how:
 
-![Hero](./readme-assets/animation-3.gif)
+![Hero](./readme-assets/single.mp4)
 
 - **Select/Deselect Pins**: Hold down the `ShiftKey` + `rightClick` on any pin to select it. Right-clicking again (while holding shift) will deselect it.
 - **Download Selected**: Once you've selected your pins, click the first download button.
