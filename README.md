@@ -8,7 +8,6 @@
 
 -   **Import & Export History**: Easily back up your download history to a JSON file. This is perfect for transferring your history to a new browser or computer. You can import a previously exported history file to pick up right where you left off.
 -   **Clear History**: Want a fresh start? You can now clear your entire download history with a single click.
--   **UI Toggle for Skipping Pins**: The "Skip Already Downloaded Pins" feature can now be toggled on or off directly from the downloader's UI, giving you more flexibility during your download sessions.
 
 ## What's New (v1.1 - July 20, 2025)
 
