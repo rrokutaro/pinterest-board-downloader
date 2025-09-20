@@ -2,7 +2,7 @@
 
 ![Hero](./readme-assets/download.png)
 
-![Hero](./readme-assets/pinpage.png)
+![Hero](./readme-assets/pinpage.jpeg)
 
 ## What's New (v1.2 - Sept 19, 2025)
 
