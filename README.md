@@ -1,6 +1,8 @@
 # Pinterest Board & Pin Downloader Extension
 
-## ![Hero](./readme-assets/download.png)
+![Hero](./readme-assets/download.png)
+
+![Hero](./readme-assets/pin-page.png)
 
 ## What's New (v1.2 - Sept 19, 2025)
 
@@ -8,6 +10,7 @@
 
 -   **Import & Export History**: Easily back up your download history to a JSON file. This is perfect for transferring your history to a new browser or computer. You can import a previously exported history file to pick up right where you left off.
 -   **Clear History**: Want a fresh start? You can now clear your entire download history with a single click.
+-   **Minimized View**
 
 ## What's New (v1.1 - July 20, 2025)
 
