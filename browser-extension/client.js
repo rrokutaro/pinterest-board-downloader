@@ -9,6 +9,7 @@ let cancel_downloads = false;
 let stateful_mode = true;
 let MAX_CONCURRENT_DOWNLOADS = 10;
 let downloaded_pins = new Set();
+let failed_pins = new Set();
 
 let DOM_template = {
     downloader_button: { self: null },
@@ -36,6 +37,7 @@ let message_template = {
     selection_success: 'Successfully selected pins',
     select_error: 'No pins selected. Select pins & try again',
     extraction_progress: 'Extracting pin URLs',
+    video_extraction_progress: 'Extracting video URLs',
     board_count_error: 'Board pin count Not Available',
     board_no_pins: 'No board pins found for this board',
     extraction_error: 'Failed to extract all pins...',
@@ -77,7 +79,8 @@ function inject_global_styles() {
             --cc_accent_1: #007BFF;
             --cc_accent_2: #0056b3;
             --cc_bg_accent_2: rgba(0, 123, 255, 0.4);
-            --cc_success: #28a745;
+            --cc_success: #34c556;
+            --cc_bg_accent_success: rgba(52, 197, 86, 0.45);
             --cc_warning: #E8A600;
             --cc_bg_accent_warning: rgba(232, 166, 0, 0.4);
             --cc_error: #dc3545;
@@ -154,7 +157,7 @@ async function initialize() {
             inline-size: fit-content; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             font-size: var(--cc_fz_16px); font-weight: 400; color: var(--cc_fg_main); background-color: var(--cc_bg_main);
             border: 1px solid var(--cc_border); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); position: fixed;
-            left: 1.5rem; bottom: 1.5rem; cursor: pointer; z-index: 999999;
+            left: calc(72px + 0.8rem); bottom: 1.5rem; cursor: pointer; z-index: 999999;
         }
         div#cc_enable_downloader:hover {
             border-color: var(--cc_accent_1); transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
@@ -169,6 +172,12 @@ async function initialize() {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             font-size: var(--cc_fz_16px); font-weight: 400; inline-size: fit-content; color: var(--cc_fg_main);
         }
+        @media (max-width: 768px) {
+            div#cc_enable_downloader {
+                left: 50% !important;
+                transform: translateX(-50%);
+            }
+        }
     </style>
     <svg id="cc_downloader_pinterest_logo" viewBox="0 0 30 31" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_209_463)"><rect y="0.5" width="30" height="30" rx="15" fill="#E9E9E9" /><path d="M9.425 29.4375C9.25834 27.7292 9.36667 26.0917 9.75 24.525L11.25 18.05C10.9749 17.2144 10.8274 16.3421 10.8125 15.4625C10.8125 13.3625 11.825 11.8625 13.425 11.8625C14.525 11.8625 15.3375 12.6375 15.3375 14.1125C15.3375 14.5875 15.2417 15.1208 15.05 15.7125L14.4 17.8625C14.275 18.2792 14.2125 18.6625 14.2125 19.0125C14.2125 20.5125 15.35 21.35 16.8125 21.35C19.425 21.35 21.275 18.65 21.275 15.15C21.275 11.25 18.725 8.75 14.9625 8.75C10.7625 8.75 8.10001 11.4875 8.10001 15.3C8.10001 16.825 8.575 18.25 9.4875 19.225C9.1875 19.7375 8.8625 19.825 8.3875 19.825C6.8875 19.825 5.4625 17.7125 5.4625 14.825C5.4625 9.825 9.46251 5.8625 15.0625 5.8625C20.9375 5.8625 24.6375 9.975 24.6375 15.025C24.6375 20.075 21.0375 23.9625 17.1625 23.9625C16.4251 23.9722 15.6955 23.8101 15.0316 23.489C14.3677 23.1679 13.7877 22.6966 13.3375 22.1125L12.5625 25.2375C12.1744 26.8779 11.488 28.4329 10.5375 29.825C12.7833 30.5304 15.1639 30.6965 17.4859 30.3096C19.8079 29.9228 22.006 28.994 23.9019 27.5986C25.7977 26.2032 27.3379 24.3805 28.3974 22.2784C29.457 20.1763 30.006 17.854 30 15.5C30 11.5218 28.4197 7.70644 25.6066 4.8934C22.7936 2.08035 18.9783 0.5 15 0.5C11.0218 0.5 7.20645 2.08035 4.3934 4.8934C1.58036 7.70644 4.8058e-06 11.5218 4.8058e-06 15.5C-0.0023954 18.4992 0.894324 21.4302 2.57438 23.9146C4.25444 26.3991 6.64068 28.3228 9.425 29.4375Z" fill="#BD081C" /></g><defs><clipPath id="clip0_209_463"><rect y="0.5" width="30" height="30" rx="15" fill="white" /></clipPath></defs></svg>
     <h2 id="cc_downloader_text"> Enable Pinterest<br>Board Downloader</h2>
@@ -182,12 +191,13 @@ async function initialize() {
 function initialize_full_ui() {
     logger('INFO', 'Opening the downloader user interface...');
     cancel_downloads = false;
+    failed_pins.clear();
     let full_ui_wrapper_elem = html_to_element(`<div id="cc_full_ui_wrapper">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
         /* --- Styles from previous steps... --- */
         div#cc_full_ui_wrapper *, div#cc_full_ui_wrapper *::before, div#cc_full_ui_wrapper *::after { box-sizing: border-box; margin: 0; padding: 0; transition: all 250ms ease-in-out; user-select: none; }
-        div#cc_full_ui_wrapper { background-color: var(--cc_bg_main); border: 1px solid var(--cc_border); block-size: auto; bottom: 1.5rem !important; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15); color: var(--cc_fg_main); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: var(--cc_fz_12px); inline-size: clamp(320px, 90vw, 480px); left: 1.5rem !important; overflow: hidden; position: fixed !important; z-index: 999999; }
+        div#cc_full_ui_wrapper { background-color: var(--cc_bg_main); border: 1px solid var(--cc_border); block-size: auto; bottom: 1.5rem !important; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15); color: var(--cc_fg_main); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: var(--cc_fz_12px); inline-size: clamp(320px, 90vw, 480px); left: calc(72px + 0.8rem) !important; overflow: hidden; position: fixed !important; z-index: 999999; }
         div#cc_full_ui_wrapper a:hover, div#cc_full_ui_wrapper #cc_select_all_visible_pins_elem:hover { filter: brightness(0.9); }
         div#cc_full_ui_wrapper a:active, div#cc_full_ui_wrapper #cc_select_all_visible_pins_elem:active { transform: scale(0.98); }
         div#cc_full_ui_wrapper #cc_section_1 { padding: 1.5rem; }
@@ -213,35 +223,27 @@ function initialize_full_ui() {
         div#cc_full_ui_wrapper #cc_progress_log_elem.cc_countdown { animation: pulse 1s ease-in-out infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
         .cc_log { color: var(--cc_fg_main) !important; } .cc_warning { color: var(--cc_warning) !important; } .cc_error { color: var(--cc_error) !important; } .cc_success { color: var(--cc_success) !important; } .cc_visible { visibility: visible !important; } .cc_hidden { visibility: hidden !important; }
-        
-        /* --- NEW/UPDATED FOOTER STYLES --- */
-        div#cc_full_ui_wrapper footer#cc_section_3 {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.6rem 1.5rem; /* Adjusted padding */
-            inline-size: 100%;
-            font-size: var(--cc_fz_9px);
-            line-height: 1;
-            border-block-start: 1px solid var(--cc_border);
-            background-color: #F8F9FA;
-        }
-        div#cc_full_ui_wrapper footer#cc_section_3 a {
-            line-height: inherit;
-            font-weight: bold;
-            cursor: pointer;
-            color: var(--cc_fg_sec);
-        }
-        div#cc_full_ui_wrapper footer#cc_section_3 a:hover {
-            color: var(--cc_fg_main);
-        }
-        div#cc_full_ui_wrapper #cc_history_controls {
-            display: flex;
-            gap: 1rem;
+        div#cc_full_ui_wrapper footer#cc_section_3 { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 1.5rem; inline-size: 100%; font-size: var(--cc_fz_9px); line-height: 1; border-block-start: 1px solid var(--cc_border); background-color: #F8F9FA; }
+        div#cc_full_ui_wrapper footer#cc_section_3 a { line-height: inherit; font-weight: bold; cursor: pointer; color: var(--cc_fg_sec); }
+        div#cc_full_ui_wrapper footer#cc_section_3 a:hover { color: var(--cc_fg_main); }
+        div#cc_full_ui_wrapper #cc_history_controls { display: flex; gap: 1rem; }
+        div#cc_full_ui_wrapper #cc_minimize_btn { color: var(--cc_fg_sec); cursor: pointer; height: 1.5rem; position: absolute; right: 3rem; top: 1rem; width: 1.5rem; }
+        div#cc_full_ui_wrapper #cc_minimize_btn:hover { color: var(--cc_fg_main); }
+        div#cc_full_ui_wrapper #cc_minimize_btn:active { transform: scale(0.9); }
+        div#cc_full_ui_wrapper.cc_minimized #cc_section_1 > *:not(#cc_controls_wrapper) { display: none; }
+        div#cc_full_ui_wrapper.cc_minimized #cc_section_2, div#cc_full_ui_wrapper.cc_minimized #cc_section_3 { display: none; }
+        div#cc_full_ui_wrapper.cc_minimized #cc_section_1 { padding-block: 1rem; cursor: pointer; }
+        div#cc_full_ui_wrapper.cc_minimized #cc_controls_wrapper { margin-block-start: 0; }
+        div#cc_full_ui_wrapper.cc_minimized #cc_minimize_btn { display: none; }
+        div#cc_full_ui_wrapper.cc_minimized #cc_close_btn { display: none; }
+        @media (max-width: 768px) {
+            div#cc_full_ui_wrapper { left: 50% !important; transform: translateX(-50%); width: 90vw !important; }
         }
         @media (max-width: 420px) { div#cc_full_ui_wrapper #cc_controls_wrapper { flex-direction: column; align-items: stretch; gap: 1.5rem; } div#cc_full_ui_wrapper .cc_v_separator { display: none; } }
     </style>
-    <!-- The rest of the UI HTML is unchanged -->
+    <svg id="cc_minimize_btn" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
     <svg id="cc_close_btn" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.5 7.5L13.5 13.5M13.5 7.5L7.5 13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
     <section id="cc_section_1">
         <header id="branding"><svg id="cc_pinterest_icon" viewBox="0 0 12 R13" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_214_217)"><rect y="0.5" width="12" height="12" rx="6" fill="#E9E9E9" /><path d="M3.77 12.075C3.70334 11.3917 3.74667 10.7367 3.9 10.11L4.5 7.52C4.38997 7.18576 4.33097 6.83684 4.325 6.485C4.325 5.645 4.73 5.045 5.37 5.045C5.81 5.045 6.135 5.355 6.135 5.945C6.135 6.135 6.09667 6.34833 6.02 6.585L5.76 7.445C5.71 7.61167 5.685 7.765 5.685 7.905C5.685 8.505 6.14 8.84 6.725 8.84C7.77 8.84 8.51 7.76 8.51 6.36C8.51 4.8 7.49 3.8 5.985 3.8C4.305 3.8 3.24 4.895 3.24 6.42C3.24 7.03 3.43 7.6 3.795 7.99C3.675 8.195 3.545 8.23 3.355 8.23C2.755 8.23 2.185 7.385 2.185 6.23C2.185 4.23 3.785 2.645 6.025 2.645C8.375 2.645 9.855 4.29 9.855 6.31C9.855 8.33 8.415 9.885 6.865 9.885C6.57003 9.88889 6.27821 9.82405 6.01265 9.69561C5.74709 9.56717 5.51508 9.37865 5.335 9.145L5.025 10.395C4.86976 11.0511 4.5952 11.6732 4.215 12.23C5.11334 12.5122 6.06554 12.5786 6.99435 12.4239C7.92316 12.2691 8.8024 11.8976 9.56075 11.3394C10.3191 10.7813 10.9352 10.0522 11.359 9.21135C11.7828 8.37051 12.0024 7.44161 12 6.5C12 4.9087 11.3679 3.38258 10.2426 2.25736C9.11742 1.13214 7.5913 0.5 6 0.5C4.4087 0.5 2.88258 1.13214 1.75736 2.25736C0.632143 3.38258 1.92232e-06 4.9087 1.92232e-06 6.5C-0.00095816 7.69967 0.35773 8.87208 1.02975 9.86585C1.70177 10.8596 2.65627 11.6291 3.77 12.075Z" fill="#BD081C" /></g><defs><clipPath id="clip0_214_217"><rect y="0.5" width="12" height="12" rx="6" fill="white" /></clipPath></defs></svg><h1 id="cc_branding_name">Pinterest Board Downloader</h1></header>
@@ -250,9 +252,8 @@ function initialize_full_ui() {
     </section>
     <section id="cc_section_2"><div id="cc_log_wrapper"><p>Progress Log:</p><h1 id="cc_progress_log_elem">No logs to view right now.</h1></div></section>
     
-    <!-- UPDATED FOOTER HTML -->
     <footer id="cc_section_3">
-        <a id="cc_stateful_btn" data-stateful="true" role="button">Skip Downloaded Pins (Enabled)</a>
+        <a id="cc_stateful_btn" data-stateful="true" role="button">Remember Pins (Enabled)</a>
         <div id="cc_history_controls">
             <a id="cc_import_btn" role="button">Import</a>
             <a id="cc_export_btn" role="button">Export</a>
@@ -287,7 +288,6 @@ function initialize_full_ui() {
     DOM.full_ui_wrapper.close_ui_elem.self.addEventListener('click', close_full_ui);
     document.addEventListener('contextmenu', handle_click);
 
-    // This handles re-highlighting on scroll, drop, and resize events.
     document.addEventListener('scroll', remark_selected_pins);
     document.addEventListener('drop', remark_selected_pins);
     window.addEventListener('resize', remark_selected_pins);
@@ -296,22 +296,37 @@ function initialize_full_ui() {
     DOM.downloader_button.self.classList.add('cc_hidden');
     document.body.appendChild(full_ui_wrapper_elem);
 
-    // --- UPDATED EVENT LISTENERS FOR NEW FOOTER ---
     const state_control_btn = full_ui_wrapper_elem.querySelector('#cc_stateful_btn');
     const import_btn = full_ui_wrapper_elem.querySelector('#cc_import_btn');
     const export_btn = full_ui_wrapper_elem.querySelector('#cc_export_btn');
     const clear_history_btn = full_ui_wrapper_elem.querySelector('#cc_clear_history_btn');
+    const minimize_btn = full_ui_wrapper_elem.querySelector('#cc_minimize_btn');
+    const section1 = full_ui_wrapper_elem.querySelector('#cc_section_1');
+
+    minimize_btn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        full_ui_wrapper_elem.classList.add('cc_minimized');
+    });
+
+    section1.addEventListener('click', (event) => {
+        if (full_ui_wrapper_elem.classList.contains('cc_minimized')) {
+            if (event.target.closest('.cc_single_control_wrapper a, .cc_single_control_wrapper h1')) {
+                return;
+            }
+            full_ui_wrapper_elem.classList.remove('cc_minimized');
+        }
+    });
 
     state_control_btn.addEventListener("click", () => {
         stateful_mode = !stateful_mode;
         if (stateful_mode) {
             state_control_btn.dataset.stateful = "true";
-            state_control_btn.innerHTML = "Skip Downloaded Pins (Enabled)";
-            logger('INFO', `"Skip Downloaded Pins" is now ON.`);
+            state_control_btn.innerHTML = "Remember Pins (Enabled)";
+            logger('INFO', `"Remember Pins" is now ON.`);
         } else {
             state_control_btn.dataset.stateful = "false";
-            state_control_btn.innerHTML = "Skip Downloaded Pins (Disabled)";
-            logger('INFO', `"Skip Downloaded Pins" is now OFF.`);
+            state_control_btn.innerHTML = "Remember Pins (Disabled)";
+            logger('INFO', `"Remember Pins" is now OFF.`);
         }
     });
 
@@ -388,7 +403,6 @@ function clear_history() {
         localStorage.removeItem('downloaded_pins');
         logger('INFO', 'Download history has been cleared.');
         alert('Download history has been successfully cleared.');
-        // Re-highlight pins to remove the "downloaded" orange overlay
         remark_selected_pins();
     } else {
         logger('INFO', 'User cancelled the history clear action.');
@@ -407,22 +421,26 @@ async function handle_click(event) {
         const element_below = document.elementFromPoint(event.clientX, event.clientY);
         if (!element_below) return;
 
-        const match = element_below.closest('[data-test-id="pin"]');
-        if (match) {
-            const pinLink = match.querySelector('a[href*="/pin/"]');
-            let pin_url = pinLink?.href || '';
+        let pin_url = null;
+        const grid_pin_match = element_below.closest('[data-test-id="pin"]');
+        const main_pin_match = element_below.closest('[data-test-id="closeup-visual-container"]');
 
-            if (typeof pin_url === 'string' && pin_url.length > 0) {
-                pin_url = clean_pin_urls([pin_url])?.at(0);
-                if (pin_url) {
-                    if (selected_pins.has(pin_url)) {
-                        logger('INFO', `Pin unselected: ${pin_url}`);
-                        unselect_pins([pin_url]);
-                    } else {
-                        const is_downloaded = downloaded_pins.has(pin_url);
-                        logger('INFO', `Pin selected: ${pin_url} (Already downloaded: ${is_downloaded})`);
-                        select_pins([pin_url]);
-                    }
+        if (grid_pin_match) {
+            const pinLink = grid_pin_match.querySelector('a[href*="/pin/"]');
+            pin_url = pinLink?.href || '';
+        } else if (main_pin_match) {
+            pin_url = window.location.href;
+        }
+
+        if (typeof pin_url === 'string' && pin_url.length > 0) {
+            pin_url = clean_pin_urls([pin_url])?.at(0);
+            if (pin_url) {
+                if (selected_pins.has(pin_url)) {
+                    logger('INFO', `Pin unselected: ${pin_url}`);
+                    unselect_pins([pin_url]);
+                } else {
+                    logger('INFO', `Pin selected: ${pin_url}`);
+                    select_pins([pin_url]);
                 }
             }
         }
@@ -441,7 +459,7 @@ async function extract_board_pins(pin_count) {
 
     if (!stateful_mode) {
         selected_pins.clear();
-        logger('INFO', `Cleared selection list because "Skip Downloaded Pins" is off.`);
+        logger('INFO', `Cleared selection list because "Remember Pins" is off.`);
     }
 
     observer = new MutationObserver((mutation_records) => {
@@ -545,8 +563,94 @@ function start_auto_scrolling(delay = 1000, human_behavior = true) {
     }, delay);
 }
 
+
+function get_csrf_token() {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        const parts = cookie.trim().split('=');
+        if (parts[0] === 'csrftoken') {
+            return parts[1];
+        }
+    }
+    logger('WARN', 'Could not find CSRF token in cookies.');
+    return null;
+}
+
+async function get_video_url_from_pin_page(pin_slug) {
+    const pin_id = pin_slug.split('/').pop();
+    const csrf_token = get_csrf_token();
+
+    if (!csrf_token) {
+        logger('ERROR', 'CSRF token is missing. Cannot make an authenticated API request.');
+        return null;
+    }
+
+    const request_data = {
+        "options": { "id": pin_id, "field_set_key": "unauth_react_main_pin" },
+        "context": {}
+    };
+    const api_url = `${window.location.origin}/resource/PinResource/get/?source_url=/pin/${pin_id}/&data=${encodeURIComponent(JSON.stringify(request_data))}`;
+
+    try {
+        logger('DEBUG', `Fetching pin data from API for pin ID: ${pin_id}`, { url: api_url });
+        const response = await fetch(api_url, {
+            method: 'GET',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': csrf_token }
+        });
+
+        if (!response.ok) throw new Error(`API responded with status ${response.status}`);
+
+        const json_data = await response.json();
+        const pinData = json_data?.resource_response?.data;
+
+        if (!pinData) {
+            logger('WARN', `Could not find pin data in the API response for pin ID ${pin_id}.`);
+            return null;
+        }
+
+        let video_list = null;
+
+        if (pinData.story_pin_data) {
+            logger('DEBUG', `Detected Story Pin format for ${pin_id}`);
+            const pages = pinData.story_pin_data.pages || [];
+            for (const page of pages) {
+                const blocks = page.blocks || [];
+                const videoBlock = blocks.find(b => b.type === 'story_pin_video_block');
+                if (videoBlock?.video?.video_list) {
+                    video_list = videoBlock.video.video_list;
+                    break;
+                }
+            }
+        } else if (pinData.videos?.video_list) {
+            logger('DEBUG', `Detected legacy video format for ${pin_id}`);
+            video_list = pinData.videos.video_list;
+        }
+
+        if (video_list) {
+            const quality_order = ['V_720P', 'V_1080P', 'V_480P', 'V_240P'];
+            for (const quality of quality_order) {
+                if (video_list[quality] && video_list[quality].url && video_list[quality].url.includes('.mp4')) {
+                    logger('INFO', `Found best available video quality for ${pin_id}: ${quality}`);
+                    return video_list[quality].url;
+                }
+            }
+            logger('WARN', `Could not find a direct MP4 video URL for pin ${pin_id}.`);
+        } else {
+            logger('WARN', `No video_list found in the API response for pin ${pin_id}.`);
+        }
+
+        return null;
+
+    } catch (error) {
+        logger('ERROR', `Failed to get video URL via API for ${pin_slug}.`, { original_error: error });
+        return null;
+    }
+}
+
+
 async function initialize_downloads() {
     logger('INFO', 'Preparing to download selected pins...');
+    failed_pins.clear();
     if (selected_pins.size === 0) {
         logger('WARN', 'Download cancelled: No pins are selected.');
         DOM.full_ui_wrapper.progress_log_elem.self.className = 'cc_log';
@@ -554,12 +658,38 @@ async function initialize_downloads() {
         return;
     }
 
+    const pins_with_video = Array.from(selected_pins.values()).filter(p => p.has_video && !p.video_url);
+    if (pins_with_video.length > 0) {
+        logger('INFO', `Found ${pins_with_video.length} video pins. Fetching high-quality URLs...`);
+        let processed_count = 0;
+        const total_videos = pins_with_video.length;
+
+        const video_promises = pins_with_video.map(async (pin) => {
+            const video_url = await get_video_url_from_pin_page(pin.url);
+            if (video_url) {
+                pin.video_url = video_url;
+                logger('INFO', `Got video URL for ${pin.url}`);
+            } else {
+                logger('WARN', `Failed to get video URL for ${pin.url}`);
+            }
+            processed_count++;
+            DOM.full_ui_wrapper.progress_log_elem.self.className = 'cc_log';
+            update_element_html(DOM.full_ui_wrapper.progress_log_elem.self, `${message_template.video_extraction_progress}: ${processed_count}/${total_videos}`);
+        });
+        await Promise.all(video_promises);
+    }
+
     const download_items = [];
     for (const pin of selected_pins.values()) {
         const should_download = !stateful_mode || !downloaded_pins.has(pin.url);
         if (should_download) {
-            if (pin.image_url) download_items.push({ media_url: pin.image_url, pin_url: pin.url });
-            if (pin.video_url) download_items.push({ media_url: pin.video_url, pin_url: pin.url });
+            if (pin.video_url) {
+                download_items.push({ media_url: pin.video_url, pin_url: pin.url });
+            } else if (pin.image_url) {
+                download_items.push({ media_url: pin.image_url, pin_url: pin.url });
+            } else {
+                failed_pins.add(pin.url);
+            }
         } else {
             logger('INFO', `Skipping (already downloaded): ${pin.url}`);
         }
@@ -584,23 +714,40 @@ async function initialize_downloads() {
         logger('ERROR', 'The download process failed.', { original_error: err });
         DOM.full_ui_wrapper.progress_log_elem.self.className = 'cc_error';
         update_element_html(DOM.full_ui_wrapper.progress_log_elem.self, message_template.download_error);
+    } finally {
+        remark_selected_pins();
     }
 }
 
 
-function inject_selected_overlay(parentElement, is_downloaded = false, random = false) {
-    if (!parentElement || parentElement.querySelector('[data-selected-overlay]')) return;
+function inject_selected_overlay(parentElement, status = 'selected', random = false) {
+    if (!parentElement || parentElement.querySelector(`[data-selected-overlay="${status}"]`)) return;
+
+    parentElement.querySelectorAll('[data-selected-overlay]').forEach(e => e.remove());
 
     if (window.getComputedStyle(parentElement).position !== 'relative') {
         parentElement.style.position = 'relative';
         parentElement.style.zIndex = '2';
     }
 
-    const bgColor = is_downloaded ? 'var(--cc_bg_accent_warning)' : 'var(--cc_bg_accent_2)';
-    const borderColor = is_downloaded ? 'var(--cc_warning)' : 'var(--cc_accent_1)';
+    let bgColor, borderColor;
+    switch (status) {
+        case 'downloaded':
+            bgColor = 'var(--cc_bg_accent_success)';
+            borderColor = 'var(--cc_success)';
+            break;
+        case 'failed':
+            bgColor = 'var(--cc_bg_accent_warning)';
+            borderColor = 'var(--cc_warning)';
+            break;
+        default: // 'selected'
+            bgColor = 'var(--cc_bg_accent_2)';
+            borderColor = 'var(--cc_accent_1)';
+            break;
+    }
 
     const newDiv = document.createElement('div');
-    newDiv.setAttribute('data-selected-overlay', 'selected_overlay');
+    newDiv.setAttribute('data-selected-overlay', status);
     Object.assign(newDiv.style, {
         position: 'absolute',
         top: '0',
@@ -624,19 +771,30 @@ function inject_selected_overlay(parentElement, is_downloaded = false, random = 
         }
     }
     newDiv.style.borderRadius = targetBorderRadius;
-
     parentElement.prepend(newDiv);
-
-    requestAnimationFrame(() => {
-        newDiv.style.opacity = '1';
-    });
+    requestAnimationFrame(() => { newDiv.style.opacity = '1'; });
 }
+
+function get_pin_element_by_url(url) {
+    let element = document.querySelector(`[data-test-id="pin"]:has(a[href*="${url}"])`);
+    if (element) return element;
+
+    if (window.location.href.includes(url)) {
+        return document.querySelector('[data-grid-item="true"]');
+    }
+    return null;
+}
+
 
 function select_all_visible_pins() {
     logger('INFO', 'Selecting all pins currently visible on the screen...');
     let pin_urls = Array.from(document.querySelectorAll('[data-test-id="pin"] a[href*="/pin/"]'))
         .map(link => link?.href)
         .filter(Boolean);
+
+    if (document.querySelector('[data-test-id="closeup-visual-container"]')) {
+        pin_urls.push(window.location.href);
+    }
 
     if (pin_urls.length > 0) {
         select_pins(pin_urls);
@@ -651,34 +809,36 @@ async function select_pins(pin_urls, reselect = false, subtle = true) {
     let selection_changed = false;
 
     for (let url of new Set(pin_urls)) {
-        const gridItem = document.querySelector(`[data-test-id="pin"]:has(a[href*="${url}"])`);
-        if (!gridItem) continue;
+        const pin_element = get_pin_element_by_url(url);
+        if (!pin_element) continue;
 
-        const overlayHost = gridItem.querySelector('a[href*="/pin/"]');
-        if (!overlayHost) continue;
+        const overlay_host = pin_element.querySelector('a[href*="/pin/"]') || pin_element.querySelector('[data-test-id="visual-content-container"]');
+        if (!overlay_host) continue;
 
-        const is_downloaded = downloaded_pins.has(url);
+        let status = 'selected';
+        if (downloaded_pins.has(url)) status = 'downloaded';
+        else if (failed_pins.has(url)) status = 'failed';
 
         if (reselect) {
-            inject_selected_overlay(overlayHost, is_downloaded, subtle);
+            inject_selected_overlay(overlay_host, status, subtle);
             continue;
         }
 
         if (selected_pins.has(url)) continue;
 
         selection_changed = true;
-        let img = gridItem.querySelector('img');
+        let img = pin_element.querySelector('img');
         let img_srcset = img?.srcset || img?.src || '';
-        let video_url = gridItem.querySelector('video')?.src || '';
         let image_url = img_srcset ? parse_srcset(img_srcset, true) : '';
+        let has_video = !!pin_element.querySelector('video');
 
-        if (!image_url && !video_url) {
-            logger('WARN', `Could not find any image or video URL for pin: ${url}`);
+        if (!image_url && !has_video) {
+            logger('WARN', `Could not find any image or video for pin: ${url}`);
             continue;
         }
 
-        selected_pins.set(url, { url, image_url, video_url, timestamp: Date.now() });
-        inject_selected_overlay(overlayHost, is_downloaded, subtle);
+        selected_pins.set(url, { url, image_url, video_url: '', has_video, timestamp: Date.now() });
+        inject_selected_overlay(overlay_host, status, subtle);
     }
 
     if (selection_changed) {
@@ -706,19 +866,19 @@ function unselect_pins(pin_urls, random = true) {
 
     for (let url of new Set(pin_urls)) {
         selected_pins.delete(url);
-        const matches = document.querySelectorAll(`[data-test-id="pin"]:has(a[href*="${url}"])`);
-        for (let match of matches) {
-            const overlayHost = match.querySelector('a[href*="/pin/"]');
-            if (!overlayHost) continue;
+        const pin_element = get_pin_element_by_url(url);
+        if (!pin_element) continue;
 
-            let overlay = overlayHost.querySelector('[data-selected-overlay]');
-            if (overlay) {
-                let duration = random ? (300 + Math.random() * 100) : 150;
-                overlay.style.transition = `opacity ${duration}ms ease-in-out`;
-                overlay.style.opacity = '0';
-                setTimeout(() => { overlay.remove(); }, duration);
-                removal_count++;
-            }
+        const overlayHost = pin_element.querySelector('a[href*="/pin/"]') || pin_element.querySelector('[data-test-id="visual-content-container"]');
+        if (!overlayHost) continue;
+
+        let overlay = overlayHost.querySelector('[data-selected-overlay]');
+        if (overlay) {
+            let duration = random ? (300 + Math.random() * 100) : 150;
+            overlay.style.transition = `opacity ${duration}ms ease-in-out`;
+            overlay.style.opacity = '0';
+            setTimeout(() => { overlay.remove(); }, duration);
+            removal_count++;
         }
     }
 
@@ -774,6 +934,10 @@ async function download_pins(items) {
         const chunk = chunks[i];
         const promises = chunk.map(async (item) => {
             try {
+                if (item.media_url.includes('.m3u8')) {
+                    logger('WARN', `Skipping HLS stream which cannot be downloaded directly: ${item.media_url}`);
+                    return false;
+                }
                 const response = await fetch(item.media_url, { mode: 'cors' });
                 if (!response.ok) throw new Error(`Server responded with status ${response.status}`);
                 const blob = await response.blob();
@@ -786,18 +950,12 @@ async function download_pins(items) {
                 await new Promise(resolve => setTimeout(resolve, 200));
                 document.body.removeChild(link);
                 URL.revokeObjectURL(link.href);
-
                 downloaded_pins.add(item.pin_url);
-
-                const overlayHost = document.querySelector(`[data-test-id="pin"]:has(a[href*="${item.pin_url}"]) a[href*="/pin/"]`);
-                if (overlayHost) {
-                    overlayHost.querySelector('[data-selected-overlay]')?.remove();
-                    inject_selected_overlay(overlayHost, true);
-                }
-
+                failed_pins.delete(item.pin_url);
                 return true;
             } catch (error) {
                 logger('ERROR', `Download failed for ${item.media_url}`, error);
+                failed_pins.add(item.pin_url);
                 return false;
             }
         });
@@ -874,6 +1032,7 @@ function close_full_ui() {
     logger('INFO', `Saved download history of ${downloaded_pins.size} pins.`);
 
     selected_pins.clear();
+    failed_pins.clear();
 
     DOM.full_ui_wrapper.self.remove();
     DOM.downloader_button.self.classList.remove('cc_hidden');
