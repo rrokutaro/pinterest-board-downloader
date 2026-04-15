@@ -63,7 +63,7 @@ let message_template = {
     endless_stop: 'Endless Mode Stopped.'
 };
 
-const progress_logs = ['cc_log', 'cc_warning', 'cc_error', 'cc_success'];
+const progress_logs =['cc_log', 'cc_warning', 'cc_error', 'cc_success'];
 function logger(level, message, context = {}) {
     const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
     const logMessage = `[PBDL - ${timestamp}] [${level}] ${message}`;
@@ -103,8 +103,7 @@ function inject_global_styles() {
             --cc_fz_16px: clamp(14px, 0.833vw, 18px);
             --cc_fz_24px: clamp(20px, 1.25vw, 28px);
             --cc_fz_40px: clamp(32px, 2.083vw, 48px);
-        }
-        [data-test-id="pin"] a[href*="/pin/"]:focus-visible {
+        }[data-test-id="pin"] a[href*="/pin/"]:focus-visible {
             outline: none !important;
         }
         a[data-stateful] { 
@@ -375,10 +374,8 @@ function toggle_endless_mode() {
     if (!endless_btn) return;
 
     if (endless_mode_active) {
-        // STOP Endless Mode
         stop_endless_mode();
     } else {
-        // START Endless Mode
         start_endless_mode();
     }
 }
@@ -458,15 +455,43 @@ async function run_endless_loop() {
             if (record.type !== 'childList') continue;
             for (let node of record.addedNodes) {
                 if (node.nodeType !== Node.ELEMENT_NODE) continue;
-                let matches = Array.from(node.querySelectorAll('a[href*="/pin/"]')).map(link => link?.href).filter(Boolean);
-                if (matches.length > 0) {
-                    clean_pin_urls(matches).forEach(url => {
-                        if (!downloaded_pins.has(url) && !selected_pins.has(url)) {
-                            // Minimal selection logic for speed
-                            selected_pins.set(url, { url, image_url: '', video_url: '', has_video: false });
-                            found_new = true;
+                
+                let anchors = Array.from(node.querySelectorAll('a[href*="/pin/"]'));
+                // Catch the node itself if it's the anchor 
+                if (node.tagName === 'A' && node.href && node.href.includes('/pin/')) {
+                    anchors.push(node);
+                }
+
+                for (let link of anchors) {
+                    let href = link?.href;
+                    if (!href) continue;
+
+                    let urls = clean_pin_urls([href]);
+                    if (urls.length === 0) continue;
+                    let url = urls[0];
+
+                    if (!downloaded_pins.has(url) && !selected_pins.has(url)) {
+                        // Extract metadata IMMEDIATELY so we don't lose it if Pinterest evicts the DOM node before batch is ready
+                        let pin_element = link.closest('[data-test-id="pin"]') || node;
+                        let img = pin_element.querySelector('img');
+                        let img_srcset = img?.srcset || img?.src || '';
+                        let image_url = img_srcset ? parse_srcset(img_srcset, true) : '';
+                        
+                        if (image_url) {
+                            image_url = image_url.replace(/\/[\d]+x\//, '/originals/');
                         }
-                    });
+                        
+                        let has_video = !!pin_element.querySelector('video');
+
+                        selected_pins.set(url, { url, image_url, video_url: '', has_video });
+                        found_new = true;
+                        
+                        // Inject visual highlight
+                        let overlay_host = pin_element.querySelector('a[href*="/pin/"]') || pin_element.querySelector('[data-test-id="visual-content-container"]');
+                        if (overlay_host) {
+                            inject_selected_overlay(overlay_host, 'selected', true);
+                        }
+                    }
                 }
             }
         }
@@ -488,7 +513,7 @@ async function run_endless_loop() {
             await populate_metadata_for_endless_batch();
 
             // DOWNLOAD BATCH
-            const batch_items = [];
+            const batch_items =[];
             for (const pin of selected_pins.values()) {
                 if (pin.video_url) batch_items.push({ media_url: pin.video_url, pin_url: pin.url });
                 else if (pin.image_url) batch_items.push({ media_url: pin.image_url, pin_url: pin.url });
@@ -525,14 +550,19 @@ async function run_endless_loop() {
 }
 
 async function populate_metadata_for_endless_batch() {
-    // Fill in image_url and check for video
+    // Retry finding images for any that arrived blank/lazy-loaded and are still in the DOM
     for (let [url, pin] of selected_pins) {
-        const pin_element = get_pin_element_by_url(url);
-        if (pin_element) {
-            let img = pin_element.querySelector('img');
-            let img_srcset = img?.srcset || img?.src || '';
-            pin.image_url = img_srcset ? parse_srcset(img_srcset, true) : '';
-            pin.has_video = !!pin_element.querySelector('video');
+        if (!pin.image_url && !pin.has_video) {
+            const pin_element = get_pin_element_by_url(url);
+            if (pin_element) {
+                let img = pin_element.querySelector('img');
+                let img_srcset = img?.srcset || img?.src || '';
+                let image_url = img_srcset ? parse_srcset(img_srcset, true) : '';
+                if (image_url) {
+                    pin.image_url = image_url.replace(/\/[\d]+x\//, '/originals/');
+                }
+                pin.has_video = !!pin_element.querySelector('video');
+            }
         }
     }
 
@@ -627,28 +657,37 @@ async function remark_selected_pins() {
     mark_visible_pins_only();
 }
 
-// New function to only mark pins that exist on the current page
+// Function to keep visual overlays synchronized without crushing scroll performance
 function mark_visible_pins_only() {
-    let pin_urls = Array.from(selected_pins?.keys() || []);
-    let visible_count = 0;
+    // Quickly grab DOM URLs currently rendered
+    let visible_links = Array.from(document.querySelectorAll('[data-test-id="pin"] a[href*="/pin/"]'))
+        .map(a => a.href)
+        .filter(Boolean);
+        
+    if (document.querySelector('[data-test-id="closeup-visual-container"]')) {
+        visible_links.push(window.location.href);
+    }
 
-    for (let url of pin_urls) {
+    let pin_urls = clean_pin_urls(visible_links);
+
+    for (let url of new Set(pin_urls)) {
+        let status = null;
+        if (downloaded_pins.has(url)) status = 'downloaded';
+        else if (failed_pins.has(url)) status = 'failed';
+        else if (selected_pins.has(url)) status = 'selected';
+        
         const pin_element = get_pin_element_by_url(url);
-        if (!pin_element) continue; // Skip pins not on current page
+        if (!pin_element) continue;
 
-        visible_count++;
         const overlay_host = pin_element.querySelector('a[href*="/pin/"]') || pin_element.querySelector('[data-test-id="visual-content-container"]');
         if (!overlay_host) continue;
 
-        let status = 'selected';
-        if (downloaded_pins.has(url)) status = 'downloaded';
-        else if (failed_pins.has(url)) status = 'failed';
-
-        inject_selected_overlay(overlay_host, status, true);
-    }
-
-    if (visible_count > 0) {
-        logger('DEBUG', `Marked ${visible_count} of ${pin_urls.length} selected pins that are visible on current page.`);
+        if (status) {
+            inject_selected_overlay(overlay_host, status, true);
+        } else {
+            const existing = overlay_host.querySelector('[data-selected-overlay]');
+            if (existing) existing.remove();
+        }
     }
 }
 
@@ -745,7 +784,6 @@ async function extract_board_pins(pin_count) {
         }
     });
 
-    // UPDATED: Target element selection now supports board sections
     let target_elem = document.querySelector('[data-test-id="board-feed"]') ||
         document.querySelector('[data-test-id="board-section-feed"]') ||
         document.querySelector('[role="main"]') ||
@@ -874,9 +912,9 @@ async function get_video_url_from_pin_page(pin_slug) {
 
         if (pinData.story_pin_data) {
             logger('DEBUG', `Detected Story Pin format for ${pin_id}`);
-            const pages = pinData.story_pin_data.pages || [];
+            const pages = pinData.story_pin_data.pages ||[];
             for (const page of pages) {
-                const blocks = page.blocks || [];
+                const blocks = page.blocks ||[];
                 const videoBlock = blocks.find(b => b.type === 'story_pin_video_block');
                 if (videoBlock?.video?.video_list) {
                     video_list = videoBlock.video.video_list;
@@ -889,7 +927,7 @@ async function get_video_url_from_pin_page(pin_slug) {
         }
 
         if (video_list) {
-            const quality_order = ['V_720P', 'V_1080P', 'V_480P', 'V_240P'];
+            const quality_order =['V_720P', 'V_1080P', 'V_480P', 'V_240P'];
             for (const quality of quality_order) {
                 if (video_list[quality] && video_list[quality].url && video_list[quality].url.includes('.mp4')) {
                     logger('INFO', `Found best available video quality for ${pin_id}: ${quality}`);
@@ -941,7 +979,7 @@ async function initialize_downloads() {
         await Promise.all(video_promises);
     }
 
-    const download_items = [];
+    const download_items =[];
     for (const pin of selected_pins.values()) {
         const should_download = !stateful_mode || !downloaded_pins.has(pin.url);
         if (should_download) {
@@ -977,7 +1015,7 @@ async function initialize_downloads() {
         DOM.full_ui_wrapper.progress_log_elem.self.className = 'cc_error';
         update_element_html(DOM.full_ui_wrapper.progress_log_elem.self, message_template.download_error);
     } finally {
-        // Only try to remark pins that exist on the current page
+        // Remark visible pins so the ones downloaded successfully receive the visual overlays
         mark_visible_pins_only();
     }
 }
@@ -1194,7 +1232,7 @@ async function download_pins(items) {
     let failed_downloads = 0;
     let successful_downloads = 0;
 
-    const chunks = [];
+    const chunks =[];
     for (let i = 0; i < items.length; i += MAX_CONCURRENT_DOWNLOADS) {
         chunks.push(items.slice(i, i + MAX_CONCURRENT_DOWNLOADS));
     }
@@ -1404,7 +1442,6 @@ function refresh_ui_for_new_board() {
     }, 500);
 }
 
-// UPDATED: get_board_pin_count() - Now supports board sections
 function get_board_pin_count() {
     logger('DEBUG', 'Attempting to find the total pin count for this board/section...');
     const pinCountRegex = /[\d,]+\s*pin/i;
