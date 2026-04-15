@@ -1,3 +1,4 @@
+// New Version
 let selected_pins = new Map();
 let observer_running = false;
 let observer;
@@ -13,8 +14,9 @@ let failed_pins = new Set();
 
 // Endless Mode Variables
 let endless_mode_active = false;
-let endless_batch_size = 500; // Download every 500 pins (for endless mode only)
+let endless_batch_size = 100; // Download every N pins
 let endless_total_downloaded = 0;
+let endless_is_downloading = false; // Guard to prevent overlapping batch triggers
 
 let current_board_url = '';
 let url_change_observer = null;
@@ -402,7 +404,8 @@ function start_endless_mode() {
     endless_btn.dataset.active = "true";
     DOM.full_ui_wrapper.progress_log_elem.self.className = 'cc_log';
     update_element_html(DOM.full_ui_wrapper.progress_log_elem.self, message_template.endless_active);
-    logger('INFO', 'Starting Endless Mode. Will download every 50 pins.');
+    endless_is_downloading = false;
+    logger('INFO', `Starting Endless Mode. Will download every ${endless_batch_size} pins.`);
 
     // Clear current selection to start fresh
     selected_pins.clear();
@@ -415,6 +418,7 @@ function stop_endless_mode() {
     if (!endless_mode_active) return;
 
     endless_mode_active = false;
+    endless_is_downloading = false;
     cancel_downloads = true;
 
     // Stop internals
@@ -470,7 +474,8 @@ async function run_endless_loop() {
         if (found_new) update_currently_selected_pins();
 
         // CHECK BATCH SIZE
-        if (selected_pins.size >= endless_batch_size) {
+        if (selected_pins.size >= endless_batch_size && !endless_is_downloading) {
+            endless_is_downloading = true;
             // PAUSE SCROLLING & OBSERVING
             observer.disconnect();
             clearInterval(auto_scroll_interval);
@@ -502,6 +507,7 @@ async function run_endless_loop() {
             // CLEANUP & RESUME
             selected_pins.clear();
             update_currently_selected_pins();
+            endless_is_downloading = false;
 
             if (endless_mode_active) {
                 logger('INFO', 'Endless Mode: Batch finished. Resuming...');
