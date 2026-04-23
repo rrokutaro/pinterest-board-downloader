@@ -8,9 +8,13 @@ let timeout_watcher_interval = null;
 let auto_scroll_interval = null;
 let cancel_downloads = false;
 let stateful_mode = true;
-let MAX_CONCURRENT_DOWNLOADS = 10;
+let MAX_CONCURRENT_DOWNLOADS = 3; // Reduced to avoid rate limiting
+let DOWNLOAD_DELAY_MS = 400; // Base delay between downloads
+let CHUNK_DELAY_MS = 800; // Delay between chunks
+let MAX_RETRIES = 3; // Max retries for failed downloads
 let downloaded_pins = new Set();
 let failed_pins = new Set();
+let unavailable_pins = new Set(); // Pins that exist but have no media
 
 // Endless Mode Variables
 let endless_mode_active = false;
@@ -206,6 +210,7 @@ function initialize_full_ui() {
     logger('INFO', 'Opening the downloader user interface...');
     cancel_downloads = false;
     failed_pins.clear();
+    unavailable_pins.clear();
 
     // Check if we're on a board page
     is_on_board_page = check_if_board_page();
@@ -732,6 +737,11 @@ async function extract_board_pins(pin_count) {
 
     // Stop Endless Mode if active
     if (endless_mode_active) stop_endless_mode();
+    
+    // Reset rate limiting delays for fresh start
+    DOWNLOAD_DELAY_MS = 400;
+    CHUNK_DELAY_MS = 800;
+    unavailable_pins.clear();
 
     logger('INFO', `Starting automatic search for all ${pin_count} pins on the board/section...`);
     if (!Number.isInteger(pin_count) || pin_count <= 0) {
@@ -764,21 +774,32 @@ async function extract_board_pins(pin_count) {
 
         if (pin_urls.size > 0) {
             select_pins([...pin_urls]);
-            let extraction_percentage = ((selected_pins.size / pin_count) * 100).toFixed(2);
-            logger('INFO', `Found ${pin_urls.size} new pins. Total found: ${selected_pins.size} of ${pin_count}.`);
+            const total_found = selected_pins.size + unavailable_pins.size;
+            let extraction_percentage = ((total_found / pin_count) * 100).toFixed(2);
+            const unavailable_count = unavailable_pins.size;
+            const status_text = unavailable_count > 0 
+                ? `${message_template.extraction_progress}: ${extraction_percentage}% (${selected_pins.size}/${pin_count} pins, ${unavailable_count} unavailable)`
+                : `${message_template.extraction_progress}: ${extraction_percentage}% (${selected_pins.size}/${pin_count} pins)`;
+            logger('INFO', `Found ${pin_urls.size} new pins. Total found: ${selected_pins.size} of ${pin_count}. Unavailable: ${unavailable_count}`);
             DOM.full_ui_wrapper.progress_log_elem.self.className = 'cc_log';
-            update_element_html(DOM.full_ui_wrapper.progress_log_elem.self, `${message_template.extraction_progress}: ${extraction_percentage}% (${selected_pins.size}/${pin_count} pins)`);
+            update_element_html(DOM.full_ui_wrapper.progress_log_elem.self, status_text);
         }
 
-        if (selected_pins.size >= pin_count) {
-            logger('INFO', `Search complete! Found all ${selected_pins.size} pins.`);
+        // Check completion: account for unavailable pins
+        const total_accounted = selected_pins.size + unavailable_pins.size;
+        if (total_accounted >= pin_count) {
+            const unavailable_count = unavailable_pins.size;
+            logger('INFO', `Search complete! Found ${selected_pins.size} downloadable pins (${unavailable_count} unavailable).`);
             clearInterval(timeout_watcher_interval);
             clearInterval(auto_scroll_interval);
             observer?.disconnect();
             observer = null;
             observer_running = false;
             DOM.full_ui_wrapper.progress_log_elem.self.className = 'cc_success';
-            update_element_html(DOM.full_ui_wrapper.progress_log_elem.self, message_template.extraction_success);
+            const completion_msg = unavailable_count > 0
+                ? `${message_template.extraction_success} (${unavailable_count} pins unavailable)`
+                : message_template.extraction_success;
+            update_element_html(DOM.full_ui_wrapper.progress_log_elem.self, completion_msg);
             initialize_downloads();
             if (!stateful_mode) unselect_pins(Array.from(selected_pins.keys()));
         }
@@ -1006,14 +1027,32 @@ async function initialize_downloads() {
     try {
         let download_response = await download_pins(download_items);
         logger('INFO', 'Download process finished.', download_response);
+        
+        // Build detailed success message
+        let success_parts = [message_template.download_success];
+        if (download_response.successful_downloads > 0) {
+            success_parts.push(`(${download_response.successful_downloads} downloaded`);
+            if (download_response.failed_downloads > 0) {
+                success_parts[1] += `, ${download_response.failed_downloads} failed`;
+            }
+            if (unavailable_pins.size > 0) {
+                success_parts[1] += `, ${unavailable_pins.size} unavailable`;
+            }
+            success_parts[1] += ')';
+        }
+        
         DOM.full_ui_wrapper.progress_log_elem.self.className = 'cc_success';
-        update_element_html(DOM.full_ui_wrapper.progress_log_elem.self, message_template.download_success);
+        update_element_html(DOM.full_ui_wrapper.progress_log_elem.self, success_parts.join(' '));
         localStorage.setItem('downloaded_pins', JSON.stringify([...downloaded_pins]));
         logger('INFO', `Updated download history. Total history size: ${downloaded_pins.size} pins.`);
     } catch (err) {
         logger('ERROR', 'The download process failed.', { original_error: err });
         DOM.full_ui_wrapper.progress_log_elem.self.className = 'cc_error';
-        update_element_html(DOM.full_ui_wrapper.progress_log_elem.self, message_template.download_error);
+        const failed_count = failed_pins.size;
+        const error_msg = failed_count > 0 
+            ? `${message_template.download_error} (${failed_count} failed - Pinterest may be rate limiting)`
+            : message_template.download_error;
+        update_element_html(DOM.full_ui_wrapper.progress_log_elem.self, error_msg);
     } finally {
         // Remark visible pins so the ones downloaded successfully receive the visual overlays
         mark_visible_pins_only();
@@ -1142,6 +1181,7 @@ async function select_pins(pin_urls, reselect = false, subtle = true) {
 
         if (!image_url && !has_video) {
             logger('WARN', `Could not find any image or video for pin: ${url}`);
+            unavailable_pins.add(url);
             continue;
         }
 
@@ -1227,10 +1267,77 @@ function parse_srcset(srcset, best_quality = true) {
     return urls[0] || null;
 }
 
+async function download_single_pin(item, retry_count = 0) {
+    // Download a single pin with retry logic (no fallback to lower quality)
+    const fileName = item.media_url.split('/').pop().split('?')[0] || `pin_${Date.now()}`;
+    
+    // Log which pin we're downloading (only on first attempt)
+    if (retry_count === 0) {
+        logger('DEBUG', `Downloading: ${item.pin_url} -> ${fileName}`);
+    }
+    
+    try {
+        if (item.media_url.includes('.m3u8')) {
+            logger('WARN', `Skipping HLS stream (${item.pin_url}): ${item.media_url}`);
+            return { success: false, skipped: true };
+        }
+
+        // Add random jitter to delay (50-150% of base delay)
+        const jitter = DOWNLOAD_DELAY_MS * (0.5 + Math.random());
+        await new Promise(r => setTimeout(r, jitter));
+
+        const response = await fetch(item.media_url, { mode: 'cors' });
+        
+        // Handle 403 errors with retry and backoff
+        if (response.status === 403) {
+            if (retry_count < MAX_RETRIES) {
+                const backoff_delay = Math.pow(2, retry_count + 1) * 1000; // 2s, 4s, 8s
+                logger('WARN', `Blocked (403) ${item.pin_url}. Retry ${retry_count + 1}/${MAX_RETRIES} in ${backoff_delay/1000}s...`);
+                await new Promise(r => setTimeout(r, backoff_delay));
+                return download_single_pin(item, retry_count + 1);
+            } else {
+                logger('ERROR', `Failed: ${item.pin_url} -> ${fileName} (blocked after ${MAX_RETRIES} retries)`);
+                failed_pins.add(item.pin_url);
+                return { success: false, rate_limited: true };
+            }
+        }
+
+        if (!response.ok) {
+            throw new Error(`Server responded with status ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        await new Promise(resolve => setTimeout(resolve, 150));
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+        downloaded_pins.add(item.pin_url);
+        failed_pins.delete(item.pin_url);
+        return { success: true };
+    } catch (error) {
+        // Retry on network errors
+        if (retry_count < MAX_RETRIES && error.name !== 'AbortError') {
+            const backoff_delay = Math.pow(2, retry_count) * 1000; // 1s, 2s, 4s
+            logger('WARN', `Download error for ${item.pin_url}. Retry ${retry_count + 1}/${MAX_RETRIES} in ${backoff_delay/1000}s...`);
+            await new Promise(r => setTimeout(r, backoff_delay));
+            return download_single_pin(item, retry_count + 1);
+        }
+        logger('ERROR', `Failed: ${item.pin_url} -> ${fileName}`, error);
+        failed_pins.add(item.pin_url);
+        return { success: false };
+    }
+}
+
 async function download_pins(items) {
-    logger('INFO', `Starting download of ${items.length} files. This may take a moment...`);
+    logger('INFO', `Starting download of ${items.length} files. Using rate-limited mode to avoid blocking...`);
     let failed_downloads = 0;
     let successful_downloads = 0;
+    let rate_limited_count = 0;
+    let skipped_count = 0;
 
     const chunks =[];
     for (let i = 0; i < items.length; i += MAX_CONCURRENT_DOWNLOADS) {
@@ -1244,54 +1351,55 @@ async function download_pins(items) {
         }
 
         const chunk = chunks[i];
-        // Add a small delay between chunks to let the browser breathe (fixes large board freeze)
-        if (i > 0) await new Promise(r => setTimeout(r, 200));
+        
+        // Add delay between chunks with jitter to avoid detection
+        if (i > 0) {
+            const chunk_jitter = CHUNK_DELAY_MS * (0.8 + Math.random() * 0.4);
+            await new Promise(r => setTimeout(r, chunk_jitter));
+        }
 
-        const promises = chunk.map(async (item) => {
-            try {
-                if (item.media_url.includes('.m3u8')) {
-                    logger('WARN', `Skipping HLS stream which cannot be downloaded directly: ${item.media_url}`);
-                    return false;
-                }
-                const response = await fetch(item.media_url, { mode: 'cors' });
-                if (!response.ok) throw new Error(`Server responded with status ${response.status}`);
-                const blob = await response.blob();
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                const fileName = item.media_url.split('/').pop().split('?')[0] || `pin_${Date.now()}`;
-                link.download = fileName;
-                document.body.appendChild(link);
-                link.click();
-                await new Promise(resolve => setTimeout(resolve, 200));
-                document.body.removeChild(link);
-                URL.revokeObjectURL(link.href);
-                downloaded_pins.add(item.pin_url);
-                failed_pins.delete(item.pin_url);
-                return true;
-            } catch (error) {
-                logger('ERROR', `Download failed for ${item.media_url}`, error);
-                failed_pins.add(item.pin_url);
-                return false;
-            }
-        });
-
+        const promises = chunk.map(item => download_single_pin(item));
         const results = await Promise.all(promises);
-        successful_downloads += results.filter(r => r).length;
-        failed_downloads += results.filter(r => !r).length;
+        
+        for (const result of results) {
+            if (result.success) {
+                successful_downloads++;
+            } else if (result.skipped) {
+                skipped_count++;
+            } else if (result.rate_limited) {
+                rate_limited_count++;
+                failed_downloads++;
+            } else {
+                failed_downloads++;
+            }
+        }
 
         const progress_percentage = Math.min(100, (((i + 1) * MAX_CONCURRENT_DOWNLOADS / items.length) * 100));
 
-        // Only show percentage log if NOT in endless mode (endless mode has its own status)
+        // Show detailed progress
         if (!endless_mode_active) {
             DOM.full_ui_wrapper.progress_log_elem.self.className = 'cc_log';
-            update_element_html(DOM.full_ui_wrapper.progress_log_elem.self, `${message_template.download_progress}: ${progress_percentage.toFixed(0)}%`);
+            let status_parts = [`${message_template.download_progress}: ${progress_percentage.toFixed(0)}%`];
+            if (failed_downloads > 0) status_parts.push(`(${failed_downloads} failed)`);
+            update_element_html(DOM.full_ui_wrapper.progress_log_elem.self, status_parts.join(' '));
+        }
+
+        // If we're getting rate limited a lot, increase delays
+        if (rate_limited_count > 3) {
+            CHUNK_DELAY_MS = Math.min(CHUNK_DELAY_MS * 1.5, 3000);
+            DOWNLOAD_DELAY_MS = Math.min(DOWNLOAD_DELAY_MS * 1.5, 1500);
+            logger('WARN', `Detected heavy rate limiting. Slowing down... (chunk delay: ${CHUNK_DELAY_MS}ms)`);
         }
     }
 
-    if (failed_downloads > 0 && !endless_mode_active) {
-        throw new Error(`${failed_downloads} out of ${items.length} downloads failed. Check the console for details.`);
+    logger('INFO', `Download complete: ${successful_downloads} success, ${failed_downloads} failed, ${skipped_count} skipped`);
+    
+    // Don't throw on partial failures - just report them
+    // Only throw if ALL downloads failed (nothing was successful)
+    if (failed_downloads > 0 && successful_downloads === 0 && !endless_mode_active) {
+        throw new Error(`All ${failed_downloads} downloads failed. Pinterest may be blocking this content.`);
     }
-    return { failed_downloads, successful_downloads };
+    return { failed_downloads, successful_downloads, skipped_count, rate_limited_count };
 }
 
 
@@ -1412,6 +1520,9 @@ function refresh_ui_for_new_board() {
 
     // Clear visual overlays from previous board
     document.querySelectorAll('[data-selected-overlay]').forEach(e => e.remove());
+    
+    // Clear unavailable pins for the new board
+    unavailable_pins.clear();
 
     // Clear selections if stateful mode is off
     if (!stateful_mode) {
@@ -1506,6 +1617,7 @@ function close_full_ui() {
 
     selected_pins.clear();
     failed_pins.clear();
+    unavailable_pins.clear();
 
     DOM.full_ui_wrapper.self.remove();
     DOM.downloader_button.self.classList.remove('cc_hidden');
