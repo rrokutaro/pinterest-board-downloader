@@ -34,6 +34,40 @@ Get started in just a few steps:
 5.  **Load Unpacked**: Click on **Load unpacked** and select the folder you extracted in step 2.
 6.  **Start Downloading**: Navigate to Pinterest and begin downloading your favorite pins!
 
+## How to Install (Firefox)
+
+A dedicated Firefox build lives in the [`firefox-extension`](./firefox-extension) folder. It has the exact same features as the Chrome build — only the `manifest.json` and the way GSAP is loaded were adapted for Firefox.
+
+> ### ⚠️ Read this first — don't use `about:addons`
+> If you go to `about:addons` → ⚙️ → **Install Add-on From File** and pick the extension, Firefox will say it **"appears to be corrupt / damaged"**. The file is **not** corrupt — that message is Firefox's (confusingly worded) way of saying *"this add-on isn't signed by Mozilla."* Regular Firefox refuses to **permanently** install any unsigned add-on. Use the **`about:debugging`** method below instead, which is made for loading unsigned add-ons.
+
+### How to load it — use `about:debugging`
+
+This works on any Firefox, needs no signing, and is the only method you need. **Do not use `about:addons`** (see the warning above).
+
+1.  Type **`about:debugging`** in the address bar and press Enter.
+2.  Click **This Firefox** in the left sidebar.
+3.  Click **Load Temporary Add-on…**.
+4.  Open the **`firefox-extension`** folder and select **`manifest.json`**.
+    *   ⚠️ Keep the whole folder together — `manifest.json` must sit next to `client.js`, `gsap.min.js`, `gsap-shim.js` and the icons. Don't copy `manifest.json` out on its own.
+5.  Go to [pinterest.com](https://www.pinterest.com/), open a board, and the **"Enable Pinterest Board Downloader"** bar appears at the bottom.
+
+**If the bar doesn't show up:** when loaded this way, Firefox may not auto-grant site access. Open `about:addons` → the extension → **Permissions** tab → enable access for **`pinterest.com`**, then reload the Pinterest tab.
+
+> **Note:** a temporary add-on is removed every time you **restart Firefox** — just repeat the steps above (10 seconds) to load it again. After editing any file, click **Reload** on the add-on in `about:debugging`.
+
+See [`firefox-extension/README.md`](./firefox-extension/README.md) for troubleshooting and the exact differences from the Chrome build.
+
+### Why `about:addons` failed but `about:debugging` works
+
+| | `about:addons` (Install From File) | `about:debugging` (Load Temporary) |
+|---|---|---|
+| Requires a Mozilla signature? | **Yes** — mandatory on normal Firefox | **No** |
+| Permanent? | Yes, stays installed | No, cleared on restart |
+| Unsigned result | "appears to be corrupt" error | ✅ loads fine |
+
+Firefox has required add-ons to be signed since Firefox 48 (2016) as an anti-malware measure, and on the Release channel that requirement can't be turned off. `about:debugging` exists specifically so developers can load unsigned add-ons for testing — the trade-off being that they're temporary.
+
 ## How to Use the Extension
 
 ### Download All Board Pins
