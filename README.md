@@ -25,13 +25,13 @@ This extension simplifies downloading images from Pinterest with powerful, user-
 
 Get started in just a few steps:
 
-1.  **Download the latest release**: Grab the `.zip` file from the [releases page](https://github.com/rrokutaro/pinterest-board-downloader/releases).
-2.  **Extract the file**: Unzip the downloaded file to a convenient location on your computer (will be named "browser-extension" after extracting).
+1.  **Download the latest release**: Grab the `.zip` file from the [releases page](https://github.com/rrokutaro/pinterest-board-downloader/releases) will be named `pinterest-board-downloader.zip`
+2.  **Extract the zip file**: Unzip the downloaded file to a convenient location on your computer (will be named "browser-extension" after extracting).
 3.  **Open Extensions**:
     *   **Chrome**: Go to `chrome://extensions/`
     *   **Microsoft Edge**: Go to `edge://extensions`
 4.  **Enable Developer Mode**: Toggle on **Developer mode** in the top right corner.
-5.  **Load Unpacked**: Click on **Load unpacked** and select the folder you extracted in step 2.
+5.  **Load Unpacked**: Click on **Load unpacked** and select the folder you extracted in step 2 `"browser-extension"`
 6.  **Start Downloading**: Navigate to Pinterest and begin downloading your favorite pins!
 
 ## How to Use the Extension
