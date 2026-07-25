@@ -91,6 +91,12 @@
       "run_at": "document_idle"
     }
   ],
+  "web_accessible_resources": [
+    {
+      "resources": ["gsap.min.js"],
+      "matches": ["https://*.pinterest.com/*"]
+    }
+  ],
   "icons": {
     "16": "./icon-16px.png",
     "32": "./icon-32px.png",
