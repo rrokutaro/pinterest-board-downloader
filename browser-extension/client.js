@@ -8,7 +8,7 @@ let timeout_watcher_interval = null;
 let auto_scroll_interval = null;
 let cancel_downloads = false;
 let stateful_mode = true;
-let MAX_CONCURRENT_DOWNLOADS = 10;
+const DOWNLOAD_START_INTERVAL_MS = 250;
 let downloaded_pins = new Set();
 let failed_pins = new Set();
 
@@ -1780,60 +1780,49 @@ async function download_pins(items) {
     let failed_downloads = 0;
     let successful_downloads = 0;
 
-    const chunks = [];
-    for (let i = 0; i < items.length; i += MAX_CONCURRENT_DOWNLOADS) {
-        chunks.push(items.slice(i, i + MAX_CONCURRENT_DOWNLOADS));
-    }
-
-    for (let i = 0; i < chunks.length; i++) {
+    for (let i = 0; i < items.length; i++) {
         if (cancel_downloads && !endless_mode_active) {
             logger('WARN', 'Download process was cancelled by the user.');
             break;
         }
 
-        const chunk = chunks[i];
-        // Add a small delay between chunks to let the browser breathe (fixes large board freeze)
-        if (i > 0) await new Promise(r => setTimeout(r, 200));
-
-        const promises = chunk.map(async (item) => {
-            try {
-                if (item.media_url.includes('.m3u8')) {
-                    logger('WARN', `Skipping HLS stream which cannot be downloaded directly: ${item.media_url}`);
-                    return false;
-                }
-                const response = await fetch(item.media_url, { mode: 'cors' });
-                if (!response.ok) throw new Error(`Server responded with status ${response.status}`);
-                const blob = await response.blob();
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                const fileName = item.media_url.split('/').pop().split('?')[0] || `pin_${Date.now()}`;
-                link.download = fileName;
-                document.body.appendChild(link);
-                link.click();
-                await new Promise(resolve => setTimeout(resolve, 200));
-                document.body.removeChild(link);
-                URL.revokeObjectURL(link.href);
-                downloaded_pins.add(item.pin_url);
-                failed_pins.delete(item.pin_url);
-                return true;
-            } catch (error) {
-                logger('ERROR', `Download failed for ${item.media_url}`, error);
-                failed_pins.add(item.pin_url);
-                return false;
+        const item = items[i];
+        try {
+            if (item.media_url.includes('.m3u8')) {
+                throw new Error('HLS streams cannot be downloaded directly');
             }
-        });
 
-        const results = await Promise.all(promises);
-        successful_downloads += results.filter(r => r).length;
-        failed_downloads += results.filter(r => !r).length;
+            const file_name = item.media_url.split('/').pop().split('?')[0] || `pin_${Date.now()}`;
+            const response = await chrome.runtime.sendMessage({
+                type: 'download-pin',
+                url: item.media_url,
+                filename: file_name
+            });
+            if (!Number.isInteger(response?.download_id)) {
+                throw new Error(response?.error || 'Browser did not confirm the download');
+            }
+
+            downloaded_pins.add(item.pin_url);
+            failed_pins.delete(item.pin_url);
+            successful_downloads++;
+        } catch (error) {
+            logger('ERROR', `Download failed for ${item.media_url}`, error);
+            failed_pins.add(item.pin_url);
+            failed_downloads++;
+        }
+
         mark_visible_pins_only();
 
-        const progress_percentage = Math.min(100, (((i + 1) * MAX_CONCURRENT_DOWNLOADS / items.length) * 100));
+        const progress_percentage = ((i + 1) / items.length) * 100;
 
         // Only show percentage log if NOT in endless mode (endless mode has its own status)
         if (!endless_mode_active) {
             DOM.full_ui_wrapper.progress_log_elem.self.className = 'cc_log';
             update_element_html(DOM.full_ui_wrapper.progress_log_elem.self, `${message_template.download_progress}: ${progress_percentage.toFixed(0)}%`);
+        }
+
+        if (i < items.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, DOWNLOAD_START_INTERVAL_MS));
         }
     }
 
