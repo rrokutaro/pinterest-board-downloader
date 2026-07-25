@@ -138,9 +138,9 @@ function load_gsap() {
     return new Promise((resolve) => {
         if (window.gsap) { resolve(); return; }
         const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js';
+        script.src = chrome.runtime.getURL('gsap.min.js');
         script.onload = resolve;
-        script.onerror = resolve; // fallback gracefully if blocked
+        script.onerror = resolve;
         document.head.appendChild(script);
     });
 }
