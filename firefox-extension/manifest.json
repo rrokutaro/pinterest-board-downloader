@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Pinterest Board Downloader",
+  "version": "1.1.0",
+  "description": "Effortlessly save your favorite Pinterest boards and pins with our Pinterest Board Downloader extension. Organize and access your inspiration seamlessly: download entire boards or specific pins in one click. Enjoy fast, clean, and privacy-focused functionality—no unnecessary permissions required.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "pinterest-board-downloader@obezeq.github.io",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    },
+    "gecko_android": {
+      "strict_min_version": "142.0"
+    }
+  },
+  "permissions": [
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://*.pinterest.com/*",
+    "https://i.pinimg.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.pinterest.com/*"
+      ],
+      "js": [
+        "gsap.min.js",
+        "gsap-shim.js",
+        "client.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "./icon-16px.png",
+    "32": "./icon-32px.png",
+    "48": "./icon-48px.png",
+    "128": "./icon-128px.png"
+  }
+}
